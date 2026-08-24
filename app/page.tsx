@@ -1,0 +1,144 @@
+import { listGalleryItems } from "@/lib/gallery";
+import GalleryGrid from "@/components/GalleryGrid";
+import SiteHeader from "@/components/SiteHeader";
+import { site } from "@/site.config";
+import type { GalleryItem } from "@/types/gallery";
+
+// Re-check the gallery at most once a minute so new uploads appear quickly
+// without hitting the database on every single page view.
+export const revalidate = 60;
+
+export default async function HomePage() {
+  let items: GalleryItem[] = [];
+  try {
+    items = await listGalleryItems();
+  } catch (err) {
+    // A storage hiccup should never take the whole landing page down
+    console.error("Could not load gallery items", err);
+  }
+
+  return (
+    <>
+      <SiteHeader />
+
+      <main>
+        {/* ---------- Hero ---------- */}
+        <section className="hero">
+          <div className="container">
+            <p className="eyebrow">{site.hero.eyebrow}</p>
+            <h1>{site.hero.heading}</h1>
+            <p>{site.hero.subheading}</p>
+            <div className="hero-actions">
+              <a href="#gallery" className="btn btn-primary">
+                {site.hero.primaryCta}
+              </a>
+              <a href="#contact" className="btn btn-ghost">
+                {site.hero.secondaryCta}
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- What I build ---------- */}
+        <section id="work" className="section">
+          <div className="container">
+            <div className="section-head">
+              <h2>{site.work.heading}</h2>
+              <p>{site.work.sub}</p>
+            </div>
+            <div className="make-grid">
+              {site.work.items.map((item, i) => (
+                <article key={item.title} className="make-card">
+                  <span className="make-num">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- Gallery ---------- */}
+        <section id="gallery" className="section section-alt">
+          <div className="container">
+            <div className="section-head">
+              <h2>{site.gallery.heading}</h2>
+              <p>{site.gallery.sub}</p>
+            </div>
+            <GalleryGrid items={items} />
+          </div>
+        </section>
+
+        {/* ---------- Process ---------- */}
+        <section id="process" className="section">
+          <div className="container">
+            <div className="section-head">
+              <h2>{site.process.heading}</h2>
+              <p>{site.process.sub}</p>
+            </div>
+            <div className="process-grid">
+              {site.process.steps.map((step, i) => (
+                <div key={step.title} className="process-step">
+                  <div className="step-num">{i + 1}</div>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- Contact ---------- */}
+        <section id="contact" className="section section-alt">
+          <div className="container">
+            <div className="section-head">
+              <h2>{site.contact.heading}</h2>
+              <p>{site.contact.sub}</p>
+            </div>
+            <div className="contact-card">
+              <a href={`mailto:${site.email}`} className="email">
+                {site.email}
+              </a>
+              <p className="contact-meta">
+                {site.phone && (
+                  <>
+                    <a href={`tel:${site.phone.replace(/[^0-9+]/g, "")}`}>
+                      {site.phone}
+                    </a>
+                    <br />
+                  </>
+                )}
+                {site.instagram && (
+                  <>
+                    {site.instagram}
+                    <br />
+                  </>
+                )}
+                {site.location}
+              </p>
+              <a
+                href={`mailto:${site.email}?subject=Custom%20woodwork%20project`}
+                className="btn btn-solid"
+                style={{ marginTop: "1.5rem" }}
+              >
+                Send a Message
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <div className="container">
+          <span>
+            &copy; {new Date().getFullYear()} {site.businessName}. All rights
+            reserved.
+          </span>
+          <a href={`mailto:${site.email}`}>{site.email}</a>
+        </div>
+      </footer>
+    </>
+  );
+}
