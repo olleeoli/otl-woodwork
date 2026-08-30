@@ -883,7 +883,7 @@ body.lb-open .site-header {
 /* ---------- Embedded Google Form (/custom) ---------- */
 
 /* A cross-origin iframe can't report its height to the parent, so the height
-   is fixed here. Google's embed snippet reported 2451px at 640px wide; the
+   is fixed here. Google's embed snippet reported 1632px at 640px wide; the
    mobile value adds headroom because narrower text wraps taller. If the form
    gains or loses fields, these two numbers are what to retune. */
 
@@ -900,13 +900,13 @@ body.lb-open .site-header {
 .form-frame iframe {
   display: block;
   width: 100%;
-  height: 2451px;
+  height: 1632px;
   border: 0;
 }
 
 @media (max-width: 640px) {
   .form-frame iframe {
-    height: 2750px;
+    height: 1900px;
   }
 }
 

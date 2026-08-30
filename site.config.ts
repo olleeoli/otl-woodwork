@@ -119,7 +119,7 @@ export const site: SiteConfig = {
 
   custom: {
     formEmbedUrl:
-      "https://docs.google.com/forms/d/e/1FAIpQLSekQmYAjnW0Y7Z32Alht-h3ibgAmXmNEs8il03IQ9mfkJP3GA/viewform?embedded=true",
+      "https://docs.google.com/forms/d/e/1FAIpQLSf6e_nCoW-bvfbIAeUvyOYZXJc3E4crftjJcZYvyoUFsggCgg/viewform?embedded=true",
 
     eyebrow: "Custom work",
     heading: "Tell me what you have in mind.",
