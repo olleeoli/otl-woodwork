@@ -77,8 +77,45 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ? tierInput
       : undefined;
 
+  // Photos, when the edit form sends them. images and blobPathnames stay
+  // index-aligned; the first entry is the cover.
+  let images: string[] | undefined;
+  let blobPathnames: string[] | undefined;
+  if (Array.isArray(body.images)) {
+    images = body.images.filter(
+      (u): u is string => typeof u === "string" && u.length > 0
+    );
+    if (images.length === 0) {
+      return NextResponse.json(
+        { error: "A product needs at least one photo" },
+        { status: 400 }
+      );
+    }
+    blobPathnames = Array.isArray(body.blobPathnames)
+      ? body.blobPathnames.filter((p): p is string => typeof p === "string")
+      : [];
+  }
+
   try {
+    // Free the storage for any photo the edit dropped. Best effort — a file
+    // that is already gone must not block the update.
+    if (blobPathnames) {
+      const existing = await getProduct(slug);
+      const removed = (existing?.blobPathnames ?? []).filter(
+        (pathname) => !blobPathnames!.includes(pathname)
+      );
+      for (const pathname of removed) {
+        try {
+          await del(pathname);
+        } catch (err) {
+          console.error("Could not delete replaced blob (continuing)", pathname, err);
+        }
+      }
+    }
+
     const updated = await updateProduct(slug, {
+      images,
+      blobPathnames,
       title: str(body.title),
       category: str(body.category),
       description: str(body.description),

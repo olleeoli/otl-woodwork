@@ -1,19 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { FormEvent, DragEvent, ChangeEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
-import { PRODUCT_CATEGORIES, SHIPPING_TIERS } from "@/types/product";
-import type { Product, ShippingTier } from "@/types/product";
+import ProductForm from "@/components/ProductForm";
+import type { Product } from "@/types/product";
 import { formatUSD } from "@/lib/money";
 
 // Same key as the gallery admin, so signing in once covers both screens.
 const STORAGE_KEY = "otl_admin_key";
-
-interface Staged {
-  file: File;
-  previewUrl: string;
-}
 
 export default function ProductAdminPage() {
   const [adminKey, setAdminKey] = useState<string | null>(null);
@@ -28,30 +23,8 @@ export default function ProductAdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingList, setLoadingList] = useState(false);
 
-  // New-product form
-  const [staged, setStaged] = useState<Staged[]>([]);
-  const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [category, setCategory] = useState<string>(PRODUCT_CATEGORIES[0]);
-  const [customCategory, setCustomCategory] = useState("");
-  const [shippingTier, setShippingTier] = useState<ShippingTier>("medium");
-  const [description, setDescription] = useState("");
-  const [species, setSpecies] = useState("");
-  const [dimensions, setDimensions] = useState("");
-  const [finish, setFinish] = useState("");
-  const [shipsIn, setShipsIn] = useState("");
-  const [active, setActive] = useState(true);
-
-  const [dragging, setDragging] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [formSuccess, setFormSuccess] = useState("");
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // Mirrored in an effect (never during render) so the unmount cleanup below
-  // can revoke whatever object URLs were live at teardown.
-  const stagedRef = useRef<Staged[]>([]);
+  /** Slug of the product currently open for editing, if any. */
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
   const loadProducts = useCallback(async (key: string) => {
     setLoadingList(true);
@@ -69,10 +42,6 @@ export default function ProductAdminPage() {
     }
   }, []);
 
-  useEffect(() => {
-    stagedRef.current = staged;
-  }, [staged]);
-
   // Restore a previous session and load the list in one pass. sessionStorage
   // only exists after mount, so setting state from this effect is correct
   // here in a way the lint rule can't express.
@@ -86,12 +55,6 @@ export default function ProductAdminPage() {
     setChecking(false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [loadProducts]);
-
-  useEffect(() => {
-    return () => {
-      for (const s of stagedRef.current) URL.revokeObjectURL(s.previewUrl);
-    };
-  }, []);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -128,129 +91,7 @@ export default function ProductAdminPage() {
     setAdminKey(null);
     setProducts([]);
     setKeyInput("");
-  }
-
-  function acceptFiles(list: FileList | null) {
-    if (!list || list.length === 0) return;
-    const images = Array.from(list).filter((f) => f.type.startsWith("image/"));
-    if (images.length === 0) {
-      setFormError("Those files aren't images.");
-      return;
-    }
-    setFormError("");
-    setStaged((prev) => [
-      ...prev,
-      ...images.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
-    ]);
-  }
-
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    acceptFiles(e.target.files);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function handleDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setDragging(false);
-    acceptFiles(e.dataTransfer.files);
-  }
-
-  function removeStaged(index: number) {
-    setStaged((prev) => {
-      const target = prev[index];
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((_, i) => i !== index);
-    });
-  }
-
-  function resetForm() {
-    for (const s of staged) URL.revokeObjectURL(s.previewUrl);
-    setStaged([]);
-    setTitle("");
-    setPrice("");
-    setQuantity("1");
-    setCategory(PRODUCT_CATEGORIES[0]);
-    setCustomCategory("");
-    setShippingTier("medium");
-    setDescription("");
-    setSpecies("");
-    setDimensions("");
-    setFinish("");
-    setShipsIn("");
-    setActive(true);
-  }
-
-  async function handleCreate(e: FormEvent) {
-    e.preventDefault();
-    if (!adminKey) return;
-
-    setFormError("");
-    setFormSuccess("");
-
-    const finalCategory =
-      category === "Other" && customCategory.trim()
-        ? customCategory.trim()
-        : category;
-
-    if (staged.length === 0) return setFormError("Add at least one photo.");
-    if (!title.trim()) return setFormError("Give the product a title.");
-    if (!price.trim()) return setFormError("Set a price.");
-
-    setSubmitting(true);
-    try {
-      // 1. Push every photo to Blob first, keeping upload order as photo order
-      const images: string[] = [];
-      const blobPathnames: string[] = [];
-
-      for (const item of staged) {
-        const uploadForm = new FormData();
-        uploadForm.append("file", item.file);
-        const res = await fetch("/api/products/upload", {
-          method: "POST",
-          headers: { "x-admin-key": adminKey },
-          body: uploadForm,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Photo upload failed");
-        images.push(data.url);
-        blobPathnames.push(data.pathname);
-      }
-
-      // 2. Save the product record pointing at them
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-        body: JSON.stringify({
-          title: title.trim(),
-          category: finalCategory,
-          price: price.trim(),
-          quantity: Number(quantity) || 0,
-          description: description.trim() || undefined,
-          species: species.trim() || undefined,
-          dimensions: dimensions.trim() || undefined,
-          finish: finish.trim() || undefined,
-          shipsIn: shipsIn.trim() || undefined,
-          shippingTier,
-          images,
-          blobPathnames,
-          active,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save");
-
-      setProducts((prev) => [data.product, ...prev]);
-      setFormSuccess(
-        active
-          ? `"${data.product.title}" is live in the shop.`
-          : `"${data.product.title}" is saved but hidden.`
-      );
-      resetForm();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSubmitting(false);
-    }
+    setEditingSlug(null);
   }
 
   async function toggleActive(product: Product) {
@@ -273,11 +114,7 @@ export default function ProductAdminPage() {
 
   async function handleDelete(product: Product) {
     if (!adminKey) return;
-    if (
-      !confirm(
-        `Delete "${product.title}" and its photos? This can't be undone.`
-      )
-    )
+    if (!confirm(`Delete "${product.title}" and its photos? This can't be undone.`))
       return;
 
     try {
@@ -290,6 +127,7 @@ export default function ProductAdminPage() {
         throw new Error(data.error || "Delete failed");
       }
       setProducts((prev) => prev.filter((p) => p.slug !== product.slug));
+      if (editingSlug === product.slug) setEditingSlug(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     }
@@ -333,6 +171,7 @@ export default function ProductAdminPage() {
   }
 
   const liveCount = products.filter((p) => p.active).length;
+  const editing = products.find((p) => p.slug === editingSlug) ?? null;
 
   // ---------- Dashboard ----------
   return (
@@ -358,206 +197,33 @@ export default function ProductAdminPage() {
         </div>
       </div>
 
-      <section className="card">
-        <h2>Add a product</h2>
-        <form className="form" onSubmit={handleCreate}>
-          {staged.length > 0 && (
-            <div className="thumb-strip">
-              {staged.map((s, i) => (
-                <figure key={s.previewUrl}>
-                  {/* Local object URL preview — next/image isn't useful here */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.previewUrl} alt={`Photo ${i + 1}`} />
-                  <button
-                    type="button"
-                    onClick={() => removeStaged(i)}
-                    aria-label={`Remove photo ${i + 1}`}
-                  >
-                    ×
-                  </button>
-                  {i === 0 && <span className="cover-tag">Cover</span>}
-                </figure>
-              ))}
-            </div>
-          )}
-
-          <div
-            className={dragging ? "dropzone dragging" : "dropzone"}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
+      {editing ? (
+        <section className="card">
+          <h2>Editing “{editing.title}”</h2>
+          <ProductForm
+            mode="edit"
+            key={editing.slug}
+            product={editing}
+            adminKey={adminKey}
+            onSaved={(updated) => {
+              setProducts((prev) =>
+                prev.map((p) => (p.slug === updated.slug ? updated : p))
+              );
+              setEditingSlug(null);
             }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-          >
-            <strong>
-              {staged.length > 0
-                ? "Add another photo"
-                : "Drop photos here, or click to browse"}
-            </strong>
-            <span>JPG, PNG, WEBP or GIF · up to 10MB · first one is the cover</span>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-            style={{ display: "none" }}
+            onCancel={() => setEditingSlug(null)}
           />
-
-          <div className="field">
-            <label htmlFor="title">Title</label>
-            <input
-              id="title"
-              type="text"
-              placeholder="End-grain board — walnut & maple"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="price">Price (USD)</label>
-              <input
-                id="price"
-                type="text"
-                inputMode="decimal"
-                placeholder="145.00"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="qty">Quantity in stock</label>
-              <input
-                id="qty"
-                type="text"
-                inputMode="numeric"
-                placeholder="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="category">Category</label>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {PRODUCT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              {category === "Other" && (
-                <input
-                  type="text"
-                  placeholder="Type a category name"
-                  value={customCategory}
-                  onChange={(e) => setCustomCategory(e.target.value)}
-                  style={{ marginTop: "0.5rem" }}
-                />
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="tier">Shipping tier</label>
-              <select
-                id="tier"
-                value={shippingTier}
-                onChange={(e) => setShippingTier(e.target.value as ShippingTier)}
-              >
-                {SHIPPING_TIERS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="field">
-            <label htmlFor="description">Description</label>
-            <textarea
-              id="description"
-              rows={3}
-              placeholder="What a photo can't say — how it was built, how it wears, what makes this one different."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="species">Species (optional)</label>
-              <input
-                id="species"
-                type="text"
-                placeholder="Black walnut, hard maple"
-                value={species}
-                onChange={(e) => setSpecies(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="dimensions">Dimensions (optional)</label>
-              <input
-                id="dimensions"
-                type="text"
-                placeholder={'16" × 12" × 1.5"'}
-                value={dimensions}
-                onChange={(e) => setDimensions(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="finish">Finish (optional)</label>
-              <input
-                id="finish"
-                type="text"
-                placeholder="Food-safe oil & beeswax"
-                value={finish}
-                onChange={(e) => setFinish(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="shipsIn">Ships in (optional)</label>
-              <input
-                id="shipsIn"
-                type="text"
-                placeholder="2–3 business days"
-                value={shipsIn}
-                onChange={(e) => setShipsIn(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-            />
-            Live on the shop now
-          </label>
-
-          {formError && <p className="alert alert-error">{formError}</p>}
-          {formSuccess && <p className="alert alert-success">{formSuccess}</p>}
-
-          <button type="submit" className="btn btn-solid" disabled={submitting}>
-            {submitting ? "Saving…" : "Save product"}
-          </button>
-        </form>
-      </section>
+        </section>
+      ) : (
+        <section className="card">
+          <h2>Add a product</h2>
+          <ProductForm
+            mode="create"
+            adminKey={adminKey}
+            onSaved={(created) => setProducts((prev) => [created, ...prev])}
+          />
+        </section>
+      )}
 
       <div className="admin-section-head">
         <h2>Listed ({products.length})</h2>
@@ -579,7 +245,12 @@ export default function ProductAdminPage() {
       ) : (
         <div className="admin-grid">
           {products.map((product) => (
-            <div key={product.slug} className="admin-item">
+            <div
+              key={product.slug}
+              className={
+                product.slug === editingSlug ? "admin-item editing" : "admin-item"
+              }
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={product.images[0]} alt={product.title} />
               <div className="admin-item-body">
@@ -598,6 +269,16 @@ export default function ProductAdminPage() {
                 </p>
               </div>
               <div className="admin-item-actions">
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setEditingSlug(product.slug);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Edit
+                </button>
                 <button
                   type="button"
                   className="link-btn"
