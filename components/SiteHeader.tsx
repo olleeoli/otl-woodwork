@@ -2,11 +2,12 @@ import Link from "next/link";
 
 /**
  * Nav anchors are written as "/#work" rather than "#work" so they still work
- * from pages other than the homepage — a bare "#work" on /custom just scrolls
+ * from pages other than the homepage — a bare "#work" on /shop just scrolls
  * to nothing.
  *
- * On narrow screens "nav-hide-sm" drops the two least essential links so the
- * bar doesn't wrap next to the brand.
+ * On narrow screens "nav-hide-sm" drops the links that exist elsewhere on the
+ * page anyway (the hero links to the gallery, the footer carries the email),
+ * leaving Gallery / Shop / Custom so the bar never wraps into the logo.
  */
 export default function SiteHeader() {
   return (
@@ -21,11 +22,14 @@ export default function SiteHeader() {
             Work
           </Link>
           <Link href="/#gallery">Gallery</Link>
+          <Link href="/shop">Shop</Link>
           <Link href="/#process" className="nav-hide-sm">
             Process
           </Link>
           <Link href="/custom">Custom</Link>
-          <Link href="/#contact">Contact</Link>
+          <Link href="/#contact" className="nav-hide-sm">
+            Contact
+          </Link>
         </nav>
       </div>
     </header>

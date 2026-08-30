@@ -25,6 +25,7 @@ interface SiteConfig {
     steps: { title: string; body: string }[];
   };
   contact: { heading: string; sub: string };
+  shop: { heading: string; sub: string };
   custom: {
     /**
      * The Google Form embed URL. Get it from the form:
@@ -109,6 +110,11 @@ export const site: SiteConfig = {
   contact: {
     heading: "Let's build something",
     sub: "Have a project in mind? Send a note with what you're thinking and I'll get back to you.",
+  },
+
+  shop: {
+    heading: "Ready to ship",
+    sub: "Finished pieces, in hand and ready to go out. Most are one of a kind \u2014 when one sells, it's gone.",
   },
 
   custom: {
