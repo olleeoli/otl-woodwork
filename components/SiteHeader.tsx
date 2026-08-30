@@ -1,5 +1,13 @@
 import Link from "next/link";
 
+/**
+ * Nav anchors are written as "/#work" rather than "#work" so they still work
+ * from pages other than the homepage — a bare "#work" on /custom just scrolls
+ * to nothing.
+ *
+ * On narrow screens "nav-hide-sm" drops the two least essential links so the
+ * bar doesn't wrap next to the brand.
+ */
 export default function SiteHeader() {
   return (
     <header className="site-header">
@@ -9,12 +17,15 @@ export default function SiteHeader() {
           <span className="brand-sub">Custom Builds</span>
         </Link>
         <nav className="site-nav">
-          <a href="#work">Work</a>
-          <a href="#gallery">Gallery</a>
-          <a href="#process" className="nav-hide-sm">
+          <Link href="/#work" className="nav-hide-sm">
+            Work
+          </Link>
+          <Link href="/#gallery">Gallery</Link>
+          <Link href="/#process" className="nav-hide-sm">
             Process
-          </a>
-          <a href="#contact">Contact</a>
+          </Link>
+          <Link href="/custom">Custom</Link>
+          <Link href="/#contact">Contact</Link>
         </nav>
       </div>
     </header>

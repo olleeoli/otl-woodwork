@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { listGalleryItems } from "@/lib/gallery";
 import GalleryGrid from "@/components/GalleryGrid";
 import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 import { site } from "@/site.config";
 import type { GalleryItem } from "@/types/gallery";
 
@@ -32,9 +34,9 @@ export default async function HomePage() {
               <a href="#gallery" className="btn btn-primary">
                 {site.hero.primaryCta}
               </a>
-              <a href="#contact" className="btn btn-ghost">
+              <Link href="/custom" className="btn btn-ghost">
                 {site.hero.secondaryCta}
-              </a>
+              </Link>
             </div>
           </div>
         </section>
@@ -118,27 +120,19 @@ export default async function HomePage() {
                 )}
                 {site.location}
               </p>
-              <a
-                href={`mailto:${site.email}?subject=Custom%20woodwork%20project`}
+              <Link
+                href="/custom"
                 className="btn btn-solid"
                 style={{ marginTop: "1.5rem" }}
               >
-                Send a Message
-              </a>
+                Start a Project
+              </Link>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="container">
-          <span>
-            &copy; {new Date().getFullYear()} {site.businessName}. All rights
-            reserved.
-          </span>
-          <a href={`mailto:${site.email}`}>{site.email}</a>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

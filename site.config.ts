@@ -25,6 +25,19 @@ interface SiteConfig {
     steps: { title: string; body: string }[];
   };
   contact: { heading: string; sub: string };
+  custom: {
+    /**
+     * The Google Form embed URL. Get it from the form:
+     * Send -> the < > tab -> copy the src="..." value. Keep ?embedded=true
+     * on the end; it strips Google's page chrome.
+     * Leave as an empty string to hide the form and show a fallback notice.
+     */
+    formEmbedUrl: string;
+    eyebrow: string;
+    heading: string;
+    subheading: string;
+    steps: { title: string; body: string }[];
+  };
 }
 
 export const site: SiteConfig = {
@@ -96,5 +109,30 @@ export const site: SiteConfig = {
   contact: {
     heading: "Let's build something",
     sub: "Have a project in mind? Send a note with what you're thinking and I'll get back to you.",
+  },
+
+  custom: {
+    formEmbedUrl:
+      "https://docs.google.com/forms/d/e/1FAIpQLSekQmYAjnW0Y7Z32Alht-h3ibgAmXmNEs8il03IQ9mfkJP3GA/viewform?embedded=true",
+
+    eyebrow: "Custom work",
+    heading: "Tell me what you have in mind.",
+    subheading:
+      "Furniture, built-ins, signs, and one-off commissions all start here. Fill out the form below with dimensions, wood species, and finish, and I'll get back to you with a quote.",
+
+    steps: [
+      {
+        title: "You send the details",
+        body: "Product, rough dimensions, wood species, finish, and any personalization. Photos help if you have them.",
+      },
+      {
+        title: "I follow up with a quote",
+        body: "Usually within 1-2 business days, with a clear price and a build timeline.",
+      },
+      {
+        title: "A deposit reserves your spot",
+        body: "50% up front puts your project in the build queue. The balance is due before delivery.",
+      },
+    ],
   },
 };
