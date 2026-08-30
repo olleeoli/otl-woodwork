@@ -26,6 +26,16 @@ interface SiteConfig {
   };
   contact: { heading: string; sub: string };
   shop: { heading: string; sub: string };
+  commerce: {
+    /**
+     * Combined Georgia sales-tax rate as a percentage, e.g. 8.9.
+     * ZERO MEANS NO TAX IS COLLECTED, and no state selector is shown at
+     * checkout. Set this only once your accountant confirms the rate.
+     */
+    gaTaxRatePercent: number;
+    /** Shown under the Buy button. */
+    shippingNote: string;
+  };
   custom: {
     /**
      * The Google Form embed URL. Get it from the form:
@@ -110,6 +120,12 @@ export const site: SiteConfig = {
   contact: {
     heading: "Let's build something",
     sub: "Have a project in mind? Send a note with what you're thinking and I'll get back to you.",
+  },
+
+  commerce: {
+    gaTaxRatePercent: 0,
+    shippingNote:
+      "Free shipping within the US. Most pieces go out within 2-3 business days.",
   },
 
   shop: {

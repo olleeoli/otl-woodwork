@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import ProductGallery from "@/components/ProductGallery";
+import BuyButton from "@/components/BuyButton";
 import { getProduct } from "@/lib/products";
 import { formatUSD } from "@/lib/money";
+import { isCheckoutConfigured } from "@/lib/square";
 import { site } from "@/site.config";
 
 export const revalidate = 60;
@@ -48,8 +50,8 @@ export default async function ProductPage({ params }: Ctx) {
     ["Ships", product.shipsIn],
   ].filter((row): row is [string, string] => Boolean(row[1]));
 
-  // Until checkout exists, the CTA opens an email with the piece identified.
-  // Phase 2 replaces this block with a Square payment link.
+  // Checkout is the CTA when Square is configured. The mailto below is the
+  // fallback for a deploy with no credentials — better than a dead button.
   const mailto =
     `mailto:${site.email}` +
     `?subject=${encodeURIComponent(`Order: ${product.title}`)}` +
@@ -117,6 +119,12 @@ export default async function ProductPage({ params }: Ctx) {
                       again to your dimensions.
                     </p>
                   </>
+                ) : isCheckoutConfigured() ? (
+                  <BuyButton
+                    slug={product.slug}
+                    taxRatePercent={site.commerce.gaTaxRatePercent}
+                    shippingNote={site.commerce.shippingNote}
+                  />
                 ) : (
                   <>
                     <a href={mailto} className="btn btn-solid product-cta">

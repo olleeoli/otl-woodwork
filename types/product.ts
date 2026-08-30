@@ -25,6 +25,12 @@ export interface Product {
   finish?: string;
   shipsIn?: string;
 
+  /**
+   * Soft hold set when someone starts checkout, so two people can't both buy
+   * a one-of-a-kind piece in the same few minutes. Expires on its own.
+   */
+  reservedUntil?: number;
+
   /** Hidden products stay off /shop, so a listing can be built over several sittings. */
   active: boolean;
   createdAt: number;
