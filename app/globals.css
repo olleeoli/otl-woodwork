@@ -1479,3 +1479,13 @@ body.lb-open .site-header {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+.pill.held {
+  background: #f3e3cf;
+  color: #7d4c23;
+}
+
+/* Four actions can appear once a hold is live — let them wrap rather than squash. */
+.admin-item-actions {
+  flex-wrap: wrap;
+}

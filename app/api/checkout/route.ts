@@ -7,8 +7,11 @@ import type { Order } from "@/types/order";
 
 export const dynamic = "force-dynamic";
 
-/** How long a started checkout blocks other buyers on a one-of-a-kind piece. */
-const HOLD_MS = 15 * 60 * 1000;
+/** How long a started checkout blocks OTHER buyers on a one-of-a-kind piece. */
+const HOLD_MS = 10 * 60 * 1000;
+
+/** Names the cookie that identifies the browser holding a piece. */
+const HOLD_COOKIE = "otl_hold";
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -39,7 +42,15 @@ export async function POST(req: NextRequest) {
   }
 
   const now = Date.now();
-  if (product.reservedUntil && product.reservedUntil > now) {
+  const heldByThisBrowser =
+    product.reservedBy !== undefined &&
+    product.reservedBy !== "" &&
+    req.cookies.get(HOLD_COOKIE)?.value === product.reservedBy;
+
+  // A live hold blocks other buyers, never the person who placed it —
+  // otherwise anyone who backs out of Square is locked out of their own
+  // purchase until the hold expires.
+  if (product.reservedUntil && product.reservedUntil > now && !heldByThisBrowser) {
     return NextResponse.json(
       {
         error:
@@ -125,9 +136,19 @@ export async function POST(req: NextRequest) {
     };
 
     await saveOrder(order);
-    await updateProduct(product.slug, { reservedUntil: now + HOLD_MS });
+    await updateProduct(product.slug, {
+      reservedUntil: now + HOLD_MS,
+      reservedBy: orderId,
+    });
 
-    return NextResponse.json({ url, orderId });
+    const res = NextResponse.json({ url, orderId });
+    res.cookies.set(HOLD_COOKIE, orderId, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: HOLD_MS / 1000,
+    });
+    return res;
   } catch (err) {
     console.error("Checkout failed", err);
     return NextResponse.json(

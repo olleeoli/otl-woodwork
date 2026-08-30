@@ -31,6 +31,13 @@ export interface Product {
    */
   reservedUntil?: number;
 
+  /**
+   * Which checkout placed the hold. The buyer's browser carries the same
+   * value in a cookie, so the person who started checkout can always come
+   * back and retry — only *other* buyers are held off.
+   */
+  reservedBy?: string;
+
   /** Hidden products stay off /shop, so a listing can be built over several sittings. */
   active: boolean;
   createdAt: number;

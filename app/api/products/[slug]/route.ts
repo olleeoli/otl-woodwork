@@ -130,6 +130,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           ? undefined
           : Math.max(0, Math.floor(Number(body.quantity) || 0)),
       active: typeof body.active === "boolean" ? body.active : undefined,
+      // Manual release for a hold left behind by an abandoned checkout.
+      ...(body.clearHold === true ? { reservedUntil: 0, reservedBy: "" } : {}),
       order: typeof body.order === "number" ? body.order : undefined,
     });
 

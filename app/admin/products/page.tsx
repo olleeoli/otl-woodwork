@@ -26,6 +26,13 @@ export default function ProductAdminPage() {
   /** Slug of the product currently open for editing, if any. */
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
+  /**
+   * Clock sampled when the list loads. Reading Date.now() during render is
+   * impure and can make the hold badge unstable between renders; Refresh
+   * re-samples it.
+   */
+  const [now, setNow] = useState(0);
+
   const loadProducts = useCallback(async (key: string) => {
     setLoadingList(true);
     try {
@@ -35,6 +42,7 @@ export default function ProductAdminPage() {
       });
       const data = await res.json();
       setProducts(data.products ?? []);
+      setNow(Date.now());
     } catch (err) {
       console.error(err);
     } finally {
@@ -109,6 +117,25 @@ export default function ProductAdminPage() {
       );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Update failed");
+    }
+  }
+
+  /** Release a hold left behind when a buyer abandoned Square's checkout. */
+  async function clearHold(product: Product) {
+    if (!adminKey) return;
+    try {
+      const res = await fetch(`/api/products/${product.slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ clearHold: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not clear the hold");
+      setProducts((prev) =>
+        prev.map((p) => (p.slug === product.slug ? data.product : p))
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not clear the hold");
     }
   }
 
@@ -265,7 +292,10 @@ export default function ProductAdminPage() {
                   <span className="price">{formatUSD(product.priceCents)}</span>{" "}
                   <span className={product.active ? "pill live" : "pill hidden-pill"}>
                     {product.active ? "Live" : "Hidden"}
-                  </span>
+                  </span>{" "}
+                  {product.reservedUntil && product.reservedUntil > now ? (
+                    <span className="pill held">On hold</span>
+                  ) : null}
                 </p>
               </div>
               <div className="admin-item-actions">
@@ -286,6 +316,15 @@ export default function ProductAdminPage() {
                 >
                   {product.active ? "Hide" : "Make live"}
                 </button>
+                {product.reservedUntil && product.reservedUntil > now ? (
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => clearHold(product)}
+                  >
+                    Clear hold
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="del"

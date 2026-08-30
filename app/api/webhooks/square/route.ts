@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
       await updateProduct(product.slug, {
         quantity: Math.max(0, product.quantity - 1),
         reservedUntil: 0,
+        reservedBy: "",
       });
     }
 
