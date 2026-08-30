@@ -43,7 +43,12 @@ export async function deleteGalleryItem(id: string): Promise<void> {
 
 export async function updateGalleryItem(
   id: string,
-  patch: Partial<Pick<GalleryItem, "title" | "category" | "description" | "order">>
+  patch: Partial<
+    Pick<
+      GalleryItem,
+      "title" | "category" | "description" | "order" | "imageUrl" | "blobPathname"
+    >
+  >
 ): Promise<GalleryItem | null> {
   const redis = getRedis();
   if (!redis) throw new Error("Redis is not configured");

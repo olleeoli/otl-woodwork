@@ -54,8 +54,30 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // A replacement photo arrives as a new Blob URL plus its pathname. Both or
+  // neither — a URL without its pathname would orphan the file forever.
+  const imageUrl =
+    typeof body.imageUrl === "string" && body.imageUrl ? body.imageUrl : undefined;
+  const blobPathname =
+    typeof body.blobPathname === "string" && body.blobPathname
+      ? body.blobPathname
+      : undefined;
+  const replacingPhoto = Boolean(imageUrl && blobPathname);
+
   try {
+    if (replacingPhoto) {
+      const existing = await getGalleryItem(id);
+      if (existing && existing.blobPathname !== blobPathname) {
+        try {
+          await del(existing.blobPathname);
+        } catch (err) {
+          console.error("Could not delete replaced photo (continuing)", err);
+        }
+      }
+    }
+
     const updated = await updateGalleryItem(id, {
+      ...(replacingPhoto ? { imageUrl, blobPathname } : {}),
       title: typeof body.title === "string" ? body.title.trim() : undefined,
       category:
         typeof body.category === "string" ? body.category.trim() : undefined,
