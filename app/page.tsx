@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { listGalleryItems } from "@/lib/gallery";
 import GalleryGrid from "@/components/GalleryGrid";
 import SiteHeader from "@/components/SiteHeader";
@@ -9,6 +10,47 @@ import type { GalleryItem } from "@/types/gallery";
 // Re-check the gallery at most once a minute so new uploads appear quickly
 // without hitting the database on every single page view.
 export const revalidate = 60;
+
+const TITLE = "OTL Woodwork — Custom Woodworking";
+const DESCRIPTION =
+  "Hand-built cutting boards, furniture, signs, and home decor. Custom woodwork made to order.";
+
+/**
+ * The link-preview thumbnail is the first photo in the gallery — the same one
+ * at the top of the page, so a shared link looks like the site.
+ *
+ * A gallery read failing here must never break the page, so it falls back to
+ * text-only tags rather than throwing during metadata generation.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  let cover: { url: string; alt: string } | null = null;
+  try {
+    const items = await listGalleryItems();
+    if (items[0]) cover = { url: items[0].imageUrl, alt: items[0].title };
+  } catch (err) {
+    console.error("Could not load a preview image", err);
+  }
+
+  return {
+    title: TITLE,
+    description: DESCRIPTION,
+    openGraph: {
+      title: TITLE,
+      description: DESCRIPTION,
+      url: "https://otlwood.com",
+      siteName: "OTL Woodwork",
+      type: "website",
+      images: cover ? [{ url: cover.url, alt: cover.alt }] : undefined,
+    },
+    twitter: {
+      // Without an image, a large card renders as an empty box.
+      card: cover ? "summary_large_image" : "summary",
+      title: TITLE,
+      description: DESCRIPTION,
+      images: cover ? [cover.url] : undefined,
+    },
+  };
+}
 
 export default async function HomePage() {
   let items: GalleryItem[] = [];

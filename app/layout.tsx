@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // Absolute base for social-preview URLs. Without it Next can't turn a
+  // relative image path into the absolute URL crawlers require.
+  metadataBase: new URL("https://otlwood.com"),
   title: "OTL Woodwork — Custom Woodworking",
   description:
     "Hand-built cutting boards, furniture, signs, and home decor. Custom woodwork made to order.",
