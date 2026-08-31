@@ -16,41 +16,33 @@ const DESCRIPTION =
   "Hand-built cutting boards, furniture, signs, and home decor. Custom woodwork made to order.";
 
 /**
- * The link-preview thumbnail is the first photo in the gallery — the same one
- * at the top of the page, so a shared link looks like the site.
+ * The link-preview thumbnail is the brand mark, not a piece of work — a
+ * shared link should look the same every time rather than changing with the
+ * newest gallery upload.
  *
- * A gallery read failing here must never break the page, so it falls back to
- * text-only tags rather than throwing during metadata generation.
+ * To change it, replace public/og-image.png. Keep it 1200x630; that is the
+ * shape every social platform crops toward.
  */
-export async function generateMetadata(): Promise<Metadata> {
-  let cover: { url: string; alt: string } | null = null;
-  try {
-    const items = await listGalleryItems();
-    if (items[0]) cover = { url: items[0].imageUrl, alt: items[0].title };
-  } catch (err) {
-    console.error("Could not load a preview image", err);
-  }
+const OG_IMAGE = "/og-image.png";
 
-  return {
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: {
     title: TITLE,
     description: DESCRIPTION,
-    openGraph: {
-      title: TITLE,
-      description: DESCRIPTION,
-      url: "https://otlwood.com",
-      siteName: "OTL Woodwork",
-      type: "website",
-      images: cover ? [{ url: cover.url, alt: cover.alt }] : undefined,
-    },
-    twitter: {
-      // Without an image, a large card renders as an empty box.
-      card: cover ? "summary_large_image" : "summary",
-      title: TITLE,
-      description: DESCRIPTION,
-      images: cover ? [cover.url] : undefined,
-    },
-  };
-}
+    url: "https://otlwood.com",
+    siteName: "OTL Woodwork",
+    type: "website",
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "OTL Woodwork" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [OG_IMAGE],
+  },
+};
 
 export default async function HomePage() {
   let items: GalleryItem[] = [];
