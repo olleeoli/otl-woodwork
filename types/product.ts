@@ -17,6 +17,12 @@ export interface Product {
   images: string[];
   /** Blob pathnames, index-aligned with images, so files can be deleted later. */
   blobPathnames: string[];
+    /**
+   * Mux-hosted videos. Optional and additive — products created before
+   * video support have no videos key, and everything that reads
+   * product.images keeps working untouched.
+   */
+    videos?: ProductVideo[];
   shippingTier: ShippingTier;
 
   /* Optional spec-table rows. Shown on the product page only when filled in. */
@@ -43,6 +49,27 @@ export interface Product {
   createdAt: number;
   /** Sort key, newest first. Defaults to createdAt. */
   order: number;
+}
+/**
+ * A video attached to a product. Hosted on Mux rather than Blob — Mux
+ * transcodes and streams adaptively, which Blob can't do.
+ *
+ * Created in "processing" state when the admin picks a file, then filled
+ * in by the Mux webhook once transcoding finishes. uploadId is the join
+ * key between those two moments.
+ */
+export interface ProductVideo {
+  /** Mux upload ID. Stable from the moment the upload starts. */
+  uploadId: string;
+  status: "processing" | "ready" | "errored";
+  /** Set once ready. Everything playback-related derives from this. */
+  playbackId?: string;
+  /** Mux asset ID. Kept so the asset can be deleted with the product. */
+  assetId?: string;
+  durationSec?: number;
+  /** Short caption. Required for accessibility. */
+  alt: string;
+  createdAt: number;
 }
 
 export type ShippingTier = "small" | "medium" | "large";

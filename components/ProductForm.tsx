@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, FormEvent } from "react";
 import { PRODUCT_CATEGORIES, SHIPPING_TIERS } from "@/types/product";
-import type { Product, ShippingTier } from "@/types/product";
+import type { Product, ShippingTier, ProductVideo } from "@/types/product";
 
 /**
  * One photo in the form. Photos already saved on the product carry url and
@@ -18,6 +18,16 @@ interface Photo {
   previewUrl?: string;
 }
 
+/**
+ * One video in the form. Mirrors Photo's split: videos already on the
+ * product carry a uploadId and a status; a newly picked one also carries
+ * local upload progress until Mux takes the file.
+ */
+interface FormVideo extends ProductVideo {
+  /** 0–100 while the browser is PUTting to Mux. Absent once handed off. */
+  uploadProgress?: number;
+}
+
 function toPhotos(product?: Product): Photo[] {
   if (!product) return [];
   return product.images.map((url, i) => ({
@@ -26,6 +36,12 @@ function toPhotos(product?: Product): Photo[] {
     pathname: product.blobPathnames[i],
   }));
 }
+
+function toVideos(product?: Product): FormVideo[] {
+  return product?.videos ? [...product.videos] : [];
+}
+
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500MB
 
 /** Shared by "Add a product" and "Edit" so the two can never drift apart. */
 export default function ProductForm({
@@ -47,6 +63,7 @@ export default function ProductForm({
     product && (PRODUCT_CATEGORIES as readonly string[]).includes(product.category);
 
   const [photos, setPhotos] = useState<Photo[]>(() => toPhotos(product));
+  const [videos, setVideos] = useState<FormVideo[]>(() => toVideos(product));
   const [title, setTitle] = useState(product?.title ?? "");
   const [price, setPrice] = useState(
     product ? (product.priceCents / 100).toFixed(2) : ""
@@ -71,9 +88,11 @@ export default function ProductForm({
   const [dragging, setDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [videoError, setVideoError] = useState("");
   const [success, setSuccess] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<Photo[]>([]);
 
   useEffect(() => {
@@ -134,6 +153,98 @@ export default function ProductForm({
     });
   }
 
+  /**
+   * Video goes straight from the browser to Mux. A 400MB body would blow
+   * past the serverless request limit, so our server only hands back a
+   * one-time upload URL and never sees the bytes.
+   */
+  async function acceptVideo(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setVideoError("That file isn't a video.");
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      setVideoError(
+        `That video is ${(file.size / 1024 / 1024).toFixed(0)}MB — the limit is 500MB.`
+      );
+      return;
+    }
+    setVideoError("");
+
+    let uploadId: string;
+    let uploadUrl: string;
+    try {
+      const res = await fetch("/api/products/video-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify(isEdit ? { slug: product!.slug } : {}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not start the upload");
+      uploadId = data.uploadId;
+      uploadUrl = data.uploadUrl;
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : "Could not start the upload");
+      return;
+    }
+
+    setVideos((prev) => [
+      ...prev,
+      {
+        uploadId,
+        status: "processing",
+        alt: "",
+        createdAt: Date.now(),
+        uploadProgress: 0,
+      },
+    ]);
+
+    // XHR rather than fetch — fetch still can't report upload progress, and
+    // a multi-minute video with no progress bar feels broken.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl);
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setVideos((prev) =>
+            prev.map((v) =>
+              v.uploadId === uploadId ? { ...v, uploadProgress: pct } : v
+            )
+          );
+        };
+        xhr.onload = () =>
+          xhr.status < 400
+            ? resolve()
+            : reject(new Error(`Upload failed (${xhr.status})`));
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.send(file);
+      });
+
+      // Handed off. Mux transcodes from here and the webhook finishes it.
+      setVideos((prev) =>
+        prev.map((v) =>
+          v.uploadId === uploadId ? { ...v, uploadProgress: undefined } : v
+        )
+      );
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : "Upload failed");
+      setVideos((prev) => prev.filter((v) => v.uploadId !== uploadId));
+    }
+  }
+
+  function removeVideo(uploadId: string) {
+    setVideos((prev) => prev.filter((v) => v.uploadId !== uploadId));
+  }
+
+  function setVideoAlt(uploadId: string, alt: string) {
+    setVideos((prev) =>
+      prev.map((v) => (v.uploadId === uploadId ? { ...v, alt } : v))
+    );
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -188,6 +299,8 @@ export default function ProductForm({
         shippingTier,
         images,
         blobPathnames,
+        // Strip the form-only progress field before it reaches the API.
+        videos: videos.map(({ uploadProgress: _drop, ...v }) => v),
         active,
       };
 
@@ -211,6 +324,7 @@ export default function ProductForm({
           if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
         }
         setPhotos([]);
+        setVideos([]);
         setTitle("");
         setPrice("");
         setQuantity("1");
@@ -294,6 +408,74 @@ export default function ProductForm({
         onChange={handleFileChange}
         style={{ display: "none" }}
       />
+
+      {/* ---------- Video ---------- */}
+
+      {videos.length > 0 && (
+        <div className="thumb-strip">
+          {videos.map((video, i) => (
+            <figure key={video.uploadId}>
+              {video.status === "ready" && video.playbackId ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={`https://image.mux.com/${video.playbackId}/thumbnail.jpg?time=0`}
+                  alt={video.alt || `Video ${i + 1}`}
+                />
+              ) : (
+                <div className="video-placeholder">
+                  {video.uploadProgress !== undefined
+                    ? `${video.uploadProgress}%`
+                    : video.status === "errored"
+                      ? "Failed"
+                      : "Processing…"}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeVideo(video.uploadId)}
+                aria-label={`Remove video ${i + 1}`}
+              >
+                ×
+              </button>
+            </figure>
+          ))}
+        </div>
+      )}
+
+      {videos.map((video, i) => (
+        <div className="field" key={`alt-${video.uploadId}`}>
+          <label htmlFor={`valt-${video.uploadId}`}>Video {i + 1} caption</label>
+          <input
+            id={`valt-${video.uploadId}`}
+            type="text"
+            placeholder="Grain close-up under raking light"
+            value={video.alt}
+            onChange={(e) => setVideoAlt(video.uploadId, e.target.value)}
+          />
+        </div>
+      ))}
+
+      <div className="dropzone" onClick={() => videoInputRef.current?.click()}>
+        <strong>
+          {videos.length > 0 ? "Add another video" : "Add a video (optional)"}
+        </strong>
+        <span>MP4, MOV or WEBM · up to 500MB · plays after the photos</span>
+      </div>
+
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm"
+        onChange={(e) => {
+          acceptVideo(e.target.files?.[0]);
+          if (videoInputRef.current) videoInputRef.current.value = "";
+        }}
+        style={{ display: "none" }}
+      />
+
+      {videoError && <p className="alert alert-error">{videoError}</p>}
+
+      {/* ---------- Details ---------- */}
 
       <div className="field">
         <label htmlFor={`title-${mode}`}>Title</label>
@@ -448,11 +630,7 @@ export default function ProductForm({
 
       <div className="form-actions">
         <button type="submit" className="btn btn-solid" disabled={submitting}>
-          {submitting
-            ? "Saving…"
-            : isEdit
-              ? "Save changes"
-              : "Save product"}
+          {submitting ? "Saving…" : isEdit ? "Save changes" : "Save product"}
         </button>
         {onCancel && (
           <button

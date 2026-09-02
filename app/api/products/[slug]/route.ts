@@ -4,7 +4,8 @@ import { del } from "@vercel/blob";
 import { deleteProduct, getProduct, updateProduct } from "@/lib/products";
 import { parsePriceToCents } from "@/lib/money";
 import { requireAdmin } from "@/lib/auth";
-import type { ShippingTier } from "@/types/product";
+import type { ShippingTier, ProductVideo } from "@/types/product";
+import { getMux } from "@/lib/mux";
 import { SHIPPING_TIERS } from "@/types/product";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,18 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       : [];
   }
 
+  // Videos, when the form sends them. Unlike images, an empty array is
+  // valid — a product is allowed to have no video.
+  let videos: ProductVideo[] | undefined;
+  if (Array.isArray(body.videos)) {
+    videos = body.videos.filter(
+      (v: unknown): v is ProductVideo =>
+        typeof v === "object" &&
+        v !== null &&
+        typeof (v as ProductVideo).uploadId === "string"
+    );
+  }
+
   try {
     // Free the storage for any photo the edit dropped. Best effort — a file
     // that is already gone must not block the update.
@@ -116,6 +129,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const updated = await updateProduct(slug, {
       images,
       blobPathnames,
+      videos,
       title: str(body.title),
       category: str(body.category),
       description: str(body.description),
