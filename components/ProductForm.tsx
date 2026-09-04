@@ -107,6 +107,58 @@ export default function ProductForm({
     };
   }, []);
 
+    /**
+   * While any video sits in "processing", ask the server whether Mux has
+   * finished. The webhook writes the result to Redis under the uploadId
+   * whether or not it knew the product slug, so this covers the "Add a
+   * product" case where the slug doesn't exist yet.
+   *
+   * Polls every 3s and stops as soon as nothing is processing. Videos still
+   * uploading (uploadProgress set) are skipped — they aren't at Mux yet.
+   */
+    useEffect(() => {
+      const pending = videos.filter(
+        (v) => v.status === "processing" && v.uploadProgress === undefined
+      );
+      if (pending.length === 0) return;
+  
+      let cancelled = false;
+  
+      const timer = setInterval(async () => {
+        for (const video of pending) {
+          try {
+            const res = await fetch(
+              `/api/products/video-upload/status?uploadId=${video.uploadId}`,
+              { headers: { "x-admin-key": adminKey }, cache: "no-store" }
+            );
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (cancelled || data.status === "processing") continue;
+  
+            setVideos((prev) =>
+              prev.map((v) =>
+                v.uploadId === video.uploadId
+                  ? {
+                      ...v,
+                      status: data.status,
+                      playbackId: data.playbackId ?? v.playbackId,
+                      assetId: data.assetId ?? v.assetId,
+                      durationSec: data.durationSec ?? v.durationSec,
+                    }
+                  : v
+              )
+            );
+          } catch {
+            // A failed poll is not worth surfacing — try again next tick.
+          }
+        }
+      }, 3000);
+  
+      return () => {
+        cancelled = true;
+        clearInterval(timer);
+      };
+    }, [videos, adminKey]);
   function acceptFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const images = Array.from(list).filter((f) => f.type.startsWith("image/"));
