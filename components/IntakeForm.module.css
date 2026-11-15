@@ -1,0 +1,43 @@
+/* Quote request form extras. Base styles come from .form / .field in globals.css. */
+
+.form :global(.field) input[type="email"],
+.form :global(.field) input[type="tel"],
+.form :global(.field) input[type="number"],
+.form :global(.field) input[type="date"],
+.form :global(.field) input[type="file"] {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.fieldset {
+  border: 0;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.fieldset legend {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 0.75rem;
+}
+
+.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: 400 !important;
+  margin-top: 0.4rem;
+}
+
+.invalid {
+  border-color: #b3261e !important;
+  outline: 1px solid #b3261e;
+}
