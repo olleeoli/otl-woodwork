@@ -16,6 +16,7 @@ import { intakeConfig } from "@/lib/otl-intake/config";
 import { forwardToMac } from "@/lib/otl-intake/forward";
 import { FormFields, clientIp, hashIp, issuePaths, jsonError, logIntake, readJson, sha256Hex } from "@/lib/otl-intake/http";
 import { outboxClient, writeOutbox } from "@/lib/otl-intake/outbox";
+import { readCapped } from "@/lib/otl-intake/blob-read";
 import { sniffSvg } from "@/lib/otl-intake/svg-sniff";
 import { fieldsHash, verifyTicket } from "@/lib/otl-intake/ticket";
 
@@ -126,28 +127,4 @@ export async function POST(req: Request) {
 function fileError(submissionId: string, reason: keyof typeof FILE_ERRORS) {
   logIntake("warn", "file rejected", { submissionId, reason });
   return jsonError(422, FILE_ERRORS[reason], { fields: ["file"] });
-}
-
-async function readCapped(stream: ReadableStream<Uint8Array>, max: number): Promise<Uint8Array> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > max) throw new Error("too_large");
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const out = new Uint8Array(total);
-  let o = 0;
-  for (const c of chunks) {
-    out.set(c, o);
-    o += c.byteLength;
-  }
-  return out;
 }
