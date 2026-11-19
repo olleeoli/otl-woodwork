@@ -35,7 +35,8 @@ const FILE_ERRORS: Record<string, string> = {
   too_large: "That file is over the 5 MB limit.",
   not_utf8: "That doesn't look like an SVG file. Please export your design as SVG.",
   not_svg: "That doesn't look like an SVG file. Please export your design as SVG.",
-  has_doctype: "That SVG contains a DOCTYPE/ENTITY section we can't accept. Please re-export it (e.g. 'Plain SVG').",
+  has_doctype:
+    "That SVG has an entity section we can't accept. Please re-export it as plain SVG (Inkscape: Save As → Plain SVG; Illustrator: SVG 1.1 with 'Preserve Illustrator Editing Capabilities' off).",
 };
 
 /** Customer-facing reference: last 8 chars of the ULID, grouped. */
