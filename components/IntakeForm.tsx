@@ -3,6 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { type Measured, measureSvgFile, previewSize } from "@/lib/otl-intake/size-preview";
 import styles from "./IntakeForm.module.css";
 
 /** Option values must match the intake contract enums (lib/otl-intake/contract.ts). */
@@ -66,6 +67,23 @@ async function postJson(url: string, body: unknown) {
 export default function IntakeForm({ siteKey, contactEmail }: { siteKey: string; contactEmail: string }) {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [file, setFile] = useState<File | null>(null);
+  // D-51: live size preview
+  const [measuredFor, setMeasuredFor] = useState<{ file: File; m: Measured | null } | null>(null);
+  const [axis, setAxis] = useState<"width" | "height">("width");
+  const [valueIn, setValueIn] = useState("");
+  useEffect(() => {
+    if (!file || file.size > MAX_BYTES) return;
+    let live = true;
+    void measureSvgFile(file).then((m) => {
+      if (live) setMeasuredFor({ file, m });
+    });
+    return () => {
+      live = false;
+    };
+  }, [file]);
+  // only the measurement of the file chosen right now (never a stale one from a previous file)
+  const measured = measuredFor && measuredFor.file === file ? measuredFor.m : null;
+  const preview = measured ? previewSize(measured.ratio, axis, Number(valueIn)) : null;
   const [advanced, setAdvanced] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -192,17 +210,58 @@ export default function IntakeForm({ siteKey, contactEmail }: { siteKey: string;
         <div className="field-row">
           <div className="field">
             <label htmlFor="axis">Size is the finished…</label>
-            <select id="axis" name="axis" defaultValue="width" className={bad("project.targetSize")}>
+            <select
+              id="axis"
+              name="axis"
+              defaultValue="width"
+              className={bad("project.targetSize")}
+              onChange={(e) => setAxis(e.target.value === "height" ? "height" : "width")}
+            >
               <option value="width">Width</option>
               <option value="height">Height</option>
             </select>
           </div>
           <div className="field">
             <label htmlFor="valueIn">…in inches</label>
-            <input id="valueIn" name="valueIn" type="number" min="0.25" max="48" step="0.01" required className={bad("project.targetSize")} />
-            <p className="field-hint">The other side scales to match your design.</p>
+            <input
+              id="valueIn"
+              name="valueIn"
+              type="number"
+              min="0.25"
+              max="48"
+              step="0.01"
+              required
+              className={bad("project.targetSize")}
+              onChange={(e) => setValueIn(e.target.value)}
+            />
+            <p className="field-hint">The other side follows your design&apos;s proportions.</p>
           </div>
         </div>
+
+        {measured && (
+          <div className={styles.preview} aria-live="polite">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local data URL, not an optimizable asset */}
+            <img src={measured.thumb} alt="Preview of your design" className={styles.thumb} />
+            <div>
+              {preview ? (
+                <p>
+                  Your design will be about{" "}
+                  <strong>
+                    {preview.widthIn.toFixed(2)} × {preview.heightIn.toFixed(2)} in
+                  </strong>{" "}
+                  (width × height).
+                </p>
+              ) : (
+                <p>Enter the {axis} above to see the finished size.</p>
+              )}
+              {preview && !preview.fitsBed && (
+                <p className={styles.warn}>
+                  That&apos;s larger than our 48 × 24 in machine bed. We can still look at it, but it may need to be made in sections or smaller.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </fieldset>
 
       <fieldset disabled={busy} className={styles.fieldset}>

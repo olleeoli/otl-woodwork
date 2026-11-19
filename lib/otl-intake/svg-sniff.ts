@@ -3,6 +3,8 @@
  * obviously wrong files. This is NOT the security boundary: the Mac treats every SVG as
  * hostile and parses it in an isolated worker (Phase 2).
  */
+import { doctypeOf } from "./doctype";
+
 export type SniffResult = { ok: true } | { ok: false; reason: "not_utf8" | "not_svg" | "has_doctype" };
 
 export function sniffSvg(bytes: Uint8Array): SniffResult {
@@ -13,8 +15,11 @@ export function sniffSvg(bytes: Uint8Array): SniffResult {
     return { ok: false, reason: "not_utf8" };
   }
   const head = text.replace(/^﻿/, "");
-  // DOCTYPE / ENTITY declarations are how XXE and billion-laughs payloads get in.
-  if (/<!DOCTYPE|<!ENTITY/i.test(head)) return { ok: false, reason: "has_doctype" };
+  // DOCTYPE / ENTITY declarations are how XXE and billion-laughs payloads get in. Only the plain
+  // public SVG header (Tinkercad, Illustrator SVG 1.1, older Inkscape) is allowed — D-50, the
+  // same rule as the Mac.
+  const dt = doctypeOf(head);
+  if ((dt.present && !dt.allowed) || /<!ENTITY/i.test(head)) return { ok: false, reason: "has_doctype" };
   if (!/<svg[\s>]/i.test(head)) return { ok: false, reason: "not_svg" };
   return { ok: true };
 }
